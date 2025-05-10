@@ -164,22 +164,66 @@ function BinancePortfolio() {
       
       console.log('Loading cached data');
       
+      let hasValidData = false;
+      
       // Parse and set portfolio data if available
       if (cachedDataStr) {
-        const cachedData = JSON.parse(cachedDataStr) as PortfolioData;
-        // Add a note that this is cached data
-        cachedData.last_updated = `${new Date(cachedData.last_updated).toLocaleTimeString()} (cached)`;
-        setPortfolioData(cachedData);
-        console.log('Loaded cached portfolio data');
+        try {
+          const cachedData = JSON.parse(cachedDataStr) as PortfolioData;
+          // Validate the cached data structure
+          if (cachedData && typeof cachedData === 'object' && 
+              'total_value' in cachedData && 
+              'change_24h' in cachedData && 
+              'holdings_count' in cachedData) {
+            // Add a note that this is cached data
+            cachedData.last_updated = `${new Date(cachedData.last_updated).toLocaleTimeString()} (cached)`;
+            setPortfolioData(cachedData);
+            hasValidData = true;
+            console.log('Loaded cached portfolio data');
+          }
+        } catch (e) {
+          console.error('Error parsing cached portfolio data:', e);
+        }
       }
       
       // Parse and set holdings data if available
-      if (cachedSpotStr) setSpotHoldings(JSON.parse(cachedSpotStr));
-      if (cachedMarginStr) setMarginHoldings(JSON.parse(cachedMarginStr));
-      if (cachedFuturesStr) setFuturesHoldings(JSON.parse(cachedFuturesStr));
+      if (cachedSpotStr) {
+        try {
+          const spotData = JSON.parse(cachedSpotStr);
+          if (Array.isArray(spotData)) {
+            setSpotHoldings(spotData);
+            hasValidData = true;
+          }
+        } catch (e) {
+          console.error('Error parsing cached spot holdings:', e);
+        }
+      }
       
-      // Return true if we loaded any cached data
-      return !!(cachedDataStr || cachedSpotStr || cachedMarginStr || cachedFuturesStr);
+      if (cachedMarginStr) {
+        try {
+          const marginData = JSON.parse(cachedMarginStr);
+          if (Array.isArray(marginData)) {
+            setMarginHoldings(marginData);
+            hasValidData = true;
+          }
+        } catch (e) {
+          console.error('Error parsing cached margin holdings:', e);
+        }
+      }
+      
+      if (cachedFuturesStr) {
+        try {
+          const futuresData = JSON.parse(cachedFuturesStr);
+          if (Array.isArray(futuresData)) {
+            setFuturesHoldings(futuresData);
+            hasValidData = true;
+          }
+        } catch (e) {
+          console.error('Error parsing cached futures holdings:', e);
+        }
+      }
+      
+      return hasValidData;
     } catch (error) {
       console.error('Error loading cached data:', error);
       return false;
@@ -188,10 +232,26 @@ function BinancePortfolio() {
   
   const saveDataToCache = (data: PortfolioData, spot: Holding[], margin: Holding[], futures: Holding[]) => {
     try {
-      localStorage.setItem('binance_portfolio_data', JSON.stringify(data));
-      localStorage.setItem('binance_spot_holdings', JSON.stringify(spot));
-      localStorage.setItem('binance_margin_holdings', JSON.stringify(margin));
-      localStorage.setItem('binance_futures_holdings', JSON.stringify(futures));
+      // Validate data before saving
+      if (data && typeof data === 'object' && 
+          'total_value' in data && 
+          'change_24h' in data && 
+          'holdings_count' in data) {
+        localStorage.setItem('binance_portfolio_data', JSON.stringify(data));
+      }
+      
+      if (Array.isArray(spot)) {
+        localStorage.setItem('binance_spot_holdings', JSON.stringify(spot));
+      }
+      
+      if (Array.isArray(margin)) {
+        localStorage.setItem('binance_margin_holdings', JSON.stringify(margin));
+      }
+      
+      if (Array.isArray(futures)) {
+        localStorage.setItem('binance_futures_holdings', JSON.stringify(futures));
+      }
+      
       console.log('Saved portfolio data to cache');
     } catch (error) {
       console.error('Error saving data to cache:', error);
@@ -936,7 +996,7 @@ function BinancePortfolio() {
     
     // Then fetch fresh data (with different loading behavior based on cache)
     if (hasCachedData) {
-      // If we have cached data, fetch in the background
+      // If we have cached data, fetch in the background without showing loading state
       fetchPortfolioData(true);
     } else {
       // If no cached data, show the loading spinner
@@ -1095,46 +1155,38 @@ function BinancePortfolio() {
 
   // Update the spot holdings card section
   const renderSpotHoldingsCard = () => (
-              <div className="bg-gradient-to-br from-blue-600/20 to-blue-900/20 rounded-xl p-4 border border-blue-500/30 shadow-md hover:shadow-blue-900/20 transition-all relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/10 rounded-bl-full"></div>
+              <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/30 rounded-xl p-4 shadow-md hover:shadow-slate-900/20 transition-all relative overflow-hidden">
                 <div className="flex items-center mb-2">
                   {spotHoldings.length > 0 ? (
-                    <div className="w-8 h-8 mr-2 relative">
+                    <div className="w-8 h-8 mr-2">
                       <img
                         src={getCoinIconUrl(spotHoldings[0].symbol)}
                         alt={spotHoldings[0].symbol}
-                        className="w-8 h-8 rounded-full object-cover bg-blue-900/30 border border-blue-500/30"
+                        className="w-8 h-8 rounded-full object-cover bg-slate-900/30 border border-slate-700/30"
                         onError={({currentTarget}) => {
-                          currentTarget.onerror = () => {
-                            currentTarget.onerror = null;
+                          currentTarget.onerror = null;
                           currentTarget.src = getCoinGeckoIconUrl(spotHoldings[0].symbol);
-                };
-              }}
-            />
-                      {spotHoldings.length > 1 && (
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-blue-800 border border-blue-500 flex items-center justify-center text-xs text-white font-bold">
-                          +{spotHoldings.length - 1}
-                        </div>
-                      )}
+                        }}
+                      />
                     </div>
                   ) : (
-                    <span className="inline-block w-4 h-4 bg-blue-500 rounded-full mr-2"></span>
+                    <span className="inline-block w-4 h-4 bg-slate-500 rounded-full mr-2"></span>
                   )}
-                  <h3 className="text-lg font-bold text-blue-400">Spot</h3>
+                  <h3 className="text-lg font-bold text-slate-300">Spot</h3>
                 </div>
                 
                 <div className="mb-2">
                   <p className="text-slate-400 text-xs mb-1">Total Investment</p>
-        <p className="text-xl font-bold text-white">{formatCurrency(calculateTotalValue(spotHoldings))}</p>
+                  <p className="text-xl font-bold text-white">{formatCurrency(calculateTotalValue(spotHoldings))}</p>
                 </div>
                 
                 <div className="mb-2">
                   <p className="text-slate-400 text-xs mb-1">24h Change</p>
-        <p className={`text-base font-semibold ${calculate24hChange(spotHoldings) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-          {formatPercentage(calculate24hChange(spotHoldings))}
-          <span className="text-slate-400 text-xs ml-1">
-            ({formatCurrency(calculate24hChangeValue(spotHoldings))})
-          </span>
+                  <p className={`text-base font-semibold ${calculate24hChange(spotHoldings) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {formatPercentage(calculate24hChange(spotHoldings))}
+                    <span className="text-slate-400 text-xs ml-1">
+                      ({formatCurrency(calculate24hChangeValue(spotHoldings))})
+                    </span>
                   </p>
                 </div>
                 
@@ -1154,141 +1206,59 @@ function BinancePortfolio() {
                 
                 <div className="mt-3 text-xs text-slate-400 flex justify-between items-center">
                   <span>{spotHoldings.length} coins</span>
-        <span>{Math.round((calculateTotalValue(spotHoldings) / portfolioData.total_value * 100) || 0)}% of portfolio</span>
+                  <span>{Math.round((calculateTotalValue(spotHoldings) / portfolioData.total_value * 100) || 0)}% of portfolio</span>
                 </div>
               </div>
   );
               
   // Update the margin holdings card section
   const renderMarginHoldingsCard = () => (
-              <div className="bg-gradient-to-br from-green-600/20 to-green-900/20 rounded-xl p-4 border border-green-500/30 shadow-md hover:shadow-green-900/20 transition-all relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-16 h-16 bg-green-500/10 rounded-bl-full"></div>
+              <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/30 rounded-xl p-4 shadow-md hover:shadow-slate-900/20 transition-all relative overflow-hidden">
                 <div className="flex items-center mb-2">
                   {marginHoldings.length > 0 ? (
-                    <div className="w-8 h-8 mr-2 relative">
+                    <div className="w-8 h-8 mr-2">
                       <img
                         src={getCoinIconUrl(marginHoldings[0].symbol)}
                         alt={marginHoldings[0].symbol}
-                        className="w-8 h-8 rounded-full object-cover bg-green-900/30 border border-green-500/30"
+                        className="w-8 h-8 rounded-full object-cover bg-slate-900/30 border border-slate-700/30"
                         onError={({currentTarget}) => {
-                          currentTarget.onerror = () => {
-                            currentTarget.onerror = null;
+                          currentTarget.onerror = null;
                           currentTarget.src = getCoinGeckoIconUrl(marginHoldings[0].symbol);
-                };
-              }}
-            />
-                      {marginHoldings.length > 1 && (
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-green-800 border border-green-500 flex items-center justify-center text-xs text-white font-bold">
-                          +{marginHoldings.length - 1}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="inline-block w-4 h-4 bg-green-500 rounded-full mr-2"></span>
-                  )}
-                  <h3 className="text-lg font-bold text-green-400">Margin</h3>
+                        }}
+                      />
+                  </div>
+                    ) : (
+                      <span className="inline-block w-4 h-4 bg-slate-500 rounded-full mr-2"></span>
+                    )}
+                    <h3 className="text-lg font-bold text-slate-300">Margin</h3>
                 </div>
-                
-                <div className="mb-2">
-                  <p className="text-slate-400 text-xs mb-1">Total Investment</p>
-        <p className="text-xl font-bold text-white">{formatCurrency(calculateTotalValue(marginHoldings))}</p>
-                </div>
-                
-                <div className="mb-2">
-                  <p className="text-slate-400 text-xs mb-1">24h Change</p>
-        <p className={`text-base font-semibold ${calculate24hChange(marginHoldings) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-          {formatPercentage(calculate24hChange(marginHoldings))}
-          <span className="text-slate-400 text-xs ml-1">
-            ({formatCurrency(calculate24hChangeValue(marginHoldings))})
-          </span>
-                  </p>
-                </div>
-                
-                <div>
-                  <p className="text-slate-400 text-xs mb-1">Total P&L</p>
-                  {marginHoldings.length > 0 && marginHoldings.some(h => h.pnl !== undefined) ? (
-                    <p className={`text-base font-semibold ${calculateTotalPnL(marginHoldings) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                      {formatCurrency(calculateTotalPnL(marginHoldings))}
-                      <span className="text-slate-400 text-xs ml-1">
-                        ({calculateTotalPnLPercentage(marginHoldings)}%)
-                      </span>
-                    </p>
-                  ) : (
-                    <p className="text-base font-semibold text-slate-400">Not available</p>
-                  )}
-                </div>
-                
-                <div className="mt-3 text-xs text-slate-400 flex justify-between items-center">
-                  <span>{marginHoldings.length} coins</span>
-        <span>{Math.round((calculateTotalValue(marginHoldings) / portfolioData.total_value * 100) || 0)}% of portfolio</span>
-                </div>
+                  <span className="text-xs text-slate-400">{marginHoldings.length} coins</span>
               </div>
   );
               
   // Update the futures holdings card section
   const renderFuturesHoldingsCard = () => (
-              <div className="bg-gradient-to-br from-orange-600/20 to-orange-900/20 rounded-xl p-4 border border-orange-500/30 shadow-md hover:shadow-orange-900/20 transition-all relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/10 rounded-bl-full"></div>
+              <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/30 rounded-xl p-4 shadow-md hover:shadow-slate-900/20 transition-all relative overflow-hidden">
                 <div className="flex items-center mb-2">
                   {futuresHoldings.length > 0 ? (
-                    <div className="w-8 h-8 mr-2 relative">
+                    <div className="w-8 h-8 mr-2">
                       <img
                         src={getCoinIconUrl(futuresHoldings[0].symbol)}
                         alt={futuresHoldings[0].symbol}
-                        className="w-8 h-8 rounded-full object-cover bg-orange-900/30 border border-orange-500/30"
+                        className="w-8 h-8 rounded-full object-cover bg-slate-900/30 border border-slate-700/30"
                         onError={({currentTarget}) => {
-                          currentTarget.onerror = () => {
-                            currentTarget.onerror = null;
+                          currentTarget.onerror = null;
                           currentTarget.src = getCoinGeckoIconUrl(futuresHoldings[0].symbol);
-                };
-              }}
-            />
-                      {futuresHoldings.length > 1 && (
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-orange-800 border border-orange-500 flex items-center justify-center text-xs text-white font-bold">
-                          +{futuresHoldings.length - 1}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="inline-block w-4 h-4 bg-orange-500 rounded-full mr-2"></span>
-                  )}
-                  <h3 className="text-lg font-bold text-orange-400">Futures</h3>
+                        }}
+                      />
                 </div>
-                
-                <div className="mb-2">
-                  <p className="text-slate-400 text-xs mb-1">Total Investment</p>
-        <p className="text-xl font-bold text-white">{formatCurrency(calculateTotalValue(futuresHoldings))}</p>
-                </div>
-                
-                <div className="mb-2">
-                  <p className="text-slate-400 text-xs mb-1">24h Change</p>
-        <p className={`text-base font-semibold ${calculate24hChange(futuresHoldings) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-          {formatPercentage(calculate24hChange(futuresHoldings))}
-          <span className="text-slate-400 text-xs ml-1">
-            ({formatCurrency(calculate24hChangeValue(futuresHoldings))})
-          </span>
-                  </p>
-                </div>
-                
-                <div>
-                  <p className="text-slate-400 text-xs mb-1">Total P&L</p>
-                  {futuresHoldings.length > 0 && futuresHoldings.some(h => h.pnl !== undefined) ? (
-                    <p className={`text-base font-semibold ${calculateTotalPnL(futuresHoldings) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                      {formatCurrency(calculateTotalPnL(futuresHoldings))}
-                      <span className="text-slate-400 text-xs ml-1">
-                        ({calculateTotalPnLPercentage(futuresHoldings)}%)
-                      </span>
-                    </p>
-                  ) : (
-                    <p className="text-base font-semibold text-slate-400">Not available</p>
-                  )}
-                </div>
-                
-                <div className="mt-3 text-xs text-slate-400 flex justify-between items-center">
-                  <span>{futuresHoldings.length} coins</span>
-        <span>{Math.round((calculateTotalValue(futuresHoldings) / portfolioData.total_value * 100) || 0)}% of portfolio</span>
-                </div>
+                    ) : (
+                      <span className="inline-block w-4 h-4 bg-slate-500 rounded-full mr-2"></span>
+                    )}
+                    <h3 className="text-lg font-bold text-slate-300">Futures</h3>
               </div>
+                  <span className="text-xs text-slate-400">{futuresHoldings.length} coins</span>
+            </div>
   );
 
   return (
@@ -1296,13 +1266,18 @@ function BinancePortfolio() {
       <header className="mb-6">
         <div className="flex justify-between items-center">
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-yellow-500/90 rounded-full flex items-center justify-center mr-3 shadow-lg">
-              <svg viewBox="0 0 24 24" focusable="false" className="w-8 h-8">
-                <path 
-                  d="M16.624 13.9202l2.7175 2.7154-7.353 7.353-7.353-7.352 2.7175-2.7164 4.6355 4.6595 4.6356-4.6595zm0-9.8405l2.7175 2.7164-7.353 7.353-7.353-7.352 2.7175-2.7164 4.6355 4.6595 4.6356-4.6595zm-4.6356 4.6595l-2.718-2.7154-2.7156 2.7164 2.7156 2.7154 2.718-2.7164z"
-                  fill="#000"
-                />
-              </svg>
+            <div className="w-12 h-12 bg-slate-800/50 rounded-full flex items-center justify-center mr-3 shadow-lg border border-slate-700/30">
+              <img 
+                src="https://bin.bnbstatic.com/static/images/common/favicon.ico"
+                alt="Binance Logo"
+                className="w-8 h-8 object-contain"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null;
+                  // Fallback to official Binance logo
+                  target.src = "https://bin.bnbstatic.com/static/images/common/logo.png";
+                }}
+              />
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 to-yellow-600">
@@ -1400,54 +1375,220 @@ function BinancePortfolio() {
               </div>
             </h2>
             
-            {/* Total Value Card */}
-            <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-5 shadow-md hover:shadow-blue-900/20 transition-all border border-slate-700/50 mb-5 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/5 rounded-bl-full"></div>
-              <div className="absolute top-2 right-2 w-10 h-10 bg-yellow-500/70 rounded-full flex items-center justify-center">
-                <svg viewBox="0 0 24 24" focusable="false" className="w-6 h-6">
-                  <path 
-                    d="M16.624 13.9202l2.7175 2.7154-7.353 7.353-7.353-7.352 2.7175-2.7164 4.6355 4.6595 4.6356-4.6595zm0-9.8405l2.7175 2.7164-7.353 7.353-7.353-7.352 2.7175-2.7164 4.6355 4.6595 4.6356-4.6595zm-4.6356 4.6595l-2.718-2.7154-2.7156 2.7164 2.7156 2.7154 2.718-2.7164z"
-                    fill="#000"
-                  />
-                </svg>
-              </div>
-              
-              <div className="flex items-center">
-                <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center mr-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                </div>
+            {/* Total Value Card - Redesigned */}
+            <div className="bg-slate-800/80 rounded-xl p-3 shadow-md border border-slate-700/50 mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+              <div className="flex flex-col md:flex-row md:items-center gap-2">
                 <div>
-                  <p className="text-slate-300 font-medium mb-1">Total Portfolio Value</p>
-                  <div className="flex items-center">
-                    <p className="text-3xl font-bold text-white">{formatCurrency(portfolioData.total_value)}</p>
-                    <span className={`text-sm font-medium ml-3 px-2 py-1 rounded-full ${portfolioData.change_24h >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                      {formatPercentage(portfolioData.change_24h)} (24h)
-                    </span>
+                  <p className="text-slate-400 text-xs font-medium mb-0.5">Total Portfolio Value</p>
+                  <div className="flex items-end gap-2">
+                    <span className="text-2xl md:text-3xl font-bold text-white">{formatCurrency(portfolioData.total_value)}</span>
+                    <span className={`text-xs md:text-sm font-medium px-2 py-0.5 rounded ${portfolioData.change_24h >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{formatPercentage(portfolioData.change_24h)} (24h)</span>
                   </div>
                 </div>
               </div>
-              
-              <div className="flex items-center justify-between mt-4">
-                <div className="flex items-center text-slate-400 text-sm">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {portfolioData.holdings_count} assets across {spotHoldings.length + marginHoldings.length + futuresHoldings.length} positions
+              <div className="flex flex-row items-center gap-4 border-t md:border-t-0 md:border-l border-slate-700/50 pt-2 md:pt-0 md:pl-4">
+                <div className="flex flex-col items-center">
+                  <span className="text-slate-400 text-xs">Assets</span>
+                  <span className="text-base font-semibold text-white">{portfolioData.holdings_count}</span>
                 </div>
-                <div className="text-sm text-slate-400 flex items-center">
-                  
-                  {/* Last updated: {portfolioData.last_updated} */}
+                <div className="flex flex-col items-center">
+                  <span className="text-slate-400 text-xs">Positions</span>
+                  <span className="text-base font-semibold text-white">{spotHoldings.length + marginHoldings.length + futuresHoldings.length}</span>
                 </div>
               </div>
             </div>
 
+            {/* Total P&L and Invested Value Card */}
+            <div className="bg-slate-800/80 rounded-xl p-3 shadow-md border border-slate-700/50 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Total P&L */}
+                <div className="bg-slate-900/50 rounded-lg p-3">
+                  <p className="text-slate-400 text-xs font-medium mb-1">Total P&L</p>
+                  <div className="flex items-end gap-2">
+                    <span className={`text-xl font-bold ${calculateTotalPnL([...spotHoldings, ...marginHoldings, ...futuresHoldings]) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {formatCurrency(calculateTotalPnL([...spotHoldings, ...marginHoldings, ...futuresHoldings]))}
+                    </span>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${calculateTotalPnL([...spotHoldings, ...marginHoldings, ...futuresHoldings]) >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                      {calculateTotalPnLPercentage([...spotHoldings, ...marginHoldings, ...futuresHoldings])}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Total Invested Value */}
+                <div className="bg-slate-900/50 rounded-lg p-3">
+                  <p className="text-slate-400 text-xs font-medium mb-1">Total Invested Value</p>
+                  <div className="flex items-end gap-2">
+                    <span className="text-xl font-bold text-white">
+                      {formatCurrency(portfolioData.total_value - calculateTotalPnL([...spotHoldings, ...marginHoldings, ...futuresHoldings]))}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
             {/* Holding Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-              {renderSpotHoldingsCard()}
-              {renderMarginHoldingsCard()}
-              {renderFuturesHoldingsCard()}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Spot Holdings Card */}
+              <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/30 rounded-xl p-4 shadow-md hover:shadow-slate-900/20 transition-all relative overflow-hidden">
+                <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center">
+                    {spotHoldings.length > 0 ? (
+                      <div className="w-8 h-8 mr-2">
+                        <img
+                          src={getCoinIconUrl(spotHoldings[0].symbol)}
+                          alt={spotHoldings[0].symbol}
+                          className="w-8 h-8 rounded-full object-cover bg-slate-900/30 border border-slate-700/30"
+                          onError={({currentTarget}) => {
+                            currentTarget.onerror = null;
+                            currentTarget.src = getCoinGeckoIconUrl(spotHoldings[0].symbol);
+                          }}
+                        />
+                </div>
+                    ) : (
+                      <span className="inline-block w-4 h-4 bg-slate-500 rounded-full mr-2"></span>
+                    )}
+                    <h3 className="text-lg font-bold text-slate-300">Spot</h3>
+                  </div>
+                  <span className="text-xs text-slate-400">{spotHoldings.length} coins</span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                <div>
+                    <p className="text-slate-400 text-xs mb-1">Total Value</p>
+                    <p className="text-lg font-bold text-white">{formatCurrency(calculateTotalValue(spotHoldings))}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-xs mb-1">24h Change</p>
+                    <p className={`text-lg font-semibold ${calculate24hChange(spotHoldings) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      {formatPercentage(calculate24hChange(spotHoldings))}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-xs mb-1">Total P&L</p>
+                    {spotHoldings.length > 0 && spotHoldings.some(h => h.pnl !== undefined) ? (
+                      <p className={`text-lg font-semibold ${calculateTotalPnL(spotHoldings) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        {formatCurrency(calculateTotalPnL(spotHoldings))}
+                      </p>
+                    ) : (
+                      <p className="text-lg font-semibold text-slate-400">-</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-xs mb-1">Portfolio %</p>
+                    <p className="text-lg font-semibold text-white">
+                      {Math.round((calculateTotalValue(spotHoldings) / portfolioData.total_value * 100) || 0)}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Margin Holdings Card */}
+              <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/30 rounded-xl p-4 shadow-md hover:shadow-slate-900/20 transition-all relative overflow-hidden">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center">
+                    {marginHoldings.length > 0 ? (
+                      <div className="w-8 h-8 mr-2">
+                        <img
+                          src={getCoinIconUrl(marginHoldings[0].symbol)}
+                          alt={marginHoldings[0].symbol}
+                          className="w-8 h-8 rounded-full object-cover bg-slate-900/30 border border-slate-700/30"
+                          onError={({currentTarget}) => {
+                            currentTarget.onerror = null;
+                            currentTarget.src = getCoinGeckoIconUrl(marginHoldings[0].symbol);
+                          }}
+                        />
+                  </div>
+                    ) : (
+                      <span className="inline-block w-4 h-4 bg-slate-500 rounded-full mr-2"></span>
+                    )}
+                    <h3 className="text-lg font-bold text-slate-300">Margin</h3>
+                </div>
+                  <span className="text-xs text-slate-400">{marginHoldings.length} coins</span>
+              </div>
+              
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-slate-400 text-xs mb-1">Total Value</p>
+                    <p className="text-lg font-bold text-white">{formatCurrency(calculateTotalValue(marginHoldings))}</p>
+                </div>
+                  <div>
+                    <p className="text-slate-400 text-xs mb-1">24h Change</p>
+                    <p className={`text-lg font-semibold ${calculate24hChange(marginHoldings) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      {formatPercentage(calculate24hChange(marginHoldings))}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-xs mb-1">Total P&L</p>
+                    {marginHoldings.length > 0 && marginHoldings.some(h => h.pnl !== undefined) ? (
+                      <p className={`text-lg font-semibold ${calculateTotalPnL(marginHoldings) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        {formatCurrency(calculateTotalPnL(marginHoldings))}
+                      </p>
+                    ) : (
+                      <p className="text-lg font-semibold text-slate-400">-</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-xs mb-1">Portfolio %</p>
+                    <p className="text-lg font-semibold text-white">
+                      {Math.round((calculateTotalValue(marginHoldings) / portfolioData.total_value * 100) || 0)}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Futures Holdings Card */}
+              <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/30 rounded-xl p-4 shadow-md hover:shadow-slate-900/20 transition-all relative overflow-hidden">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center">
+                    {futuresHoldings.length > 0 ? (
+                      <div className="w-8 h-8 mr-2">
+                        <img
+                          src={getCoinIconUrl(futuresHoldings[0].symbol)}
+                          alt={futuresHoldings[0].symbol}
+                          className="w-8 h-8 rounded-full object-cover bg-slate-900/30 border border-slate-700/30"
+                          onError={({currentTarget}) => {
+                            currentTarget.onerror = null;
+                            currentTarget.src = getCoinGeckoIconUrl(futuresHoldings[0].symbol);
+                          }}
+                        />
+                </div>
+                    ) : (
+                      <span className="inline-block w-4 h-4 bg-slate-500 rounded-full mr-2"></span>
+                    )}
+                    <h3 className="text-lg font-bold text-slate-300">Futures</h3>
+              </div>
+                  <span className="text-xs text-slate-400">{futuresHoldings.length} coins</span>
+            </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-slate-400 text-xs mb-1">Total Value</p>
+                    <p className="text-lg font-bold text-white">{formatCurrency(calculateTotalValue(futuresHoldings))}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-xs mb-1">24h Change</p>
+                    <p className={`text-lg font-semibold ${calculate24hChange(futuresHoldings) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      {formatPercentage(calculate24hChange(futuresHoldings))}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-xs mb-1">Total P&L</p>
+                    {futuresHoldings.length > 0 && futuresHoldings.some(h => h.pnl !== undefined) ? (
+                      <p className={`text-lg font-semibold ${calculateTotalPnL(futuresHoldings) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        {formatCurrency(calculateTotalPnL(futuresHoldings))}
+                      </p>
+                    ) : (
+                      <p className="text-lg font-semibold text-slate-400">-</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-xs mb-1">Portfolio %</p>
+                    <p className="text-lg font-semibold text-white">
+                      {Math.round((calculateTotalValue(futuresHoldings) / portfolioData.total_value * 100) || 0)}%
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Holdings Section with Tabs */}

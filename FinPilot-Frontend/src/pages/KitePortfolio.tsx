@@ -134,17 +134,32 @@ function KitePortfolio() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <header className="mb-8">
+      <header className="mb-6">
         <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-blue-600">
-              Kite Portfolio
-            </h1>
-            <p className="text-slate-400 mt-1">
-              Analyze your stock market investments with detailed insights
-            </p>
+          <div className="flex items-center">
+            <div className="w-12 h-12 bg-slate-800/50 rounded-full flex items-center justify-center mr-3 shadow-lg border border-slate-700/30">
+              <img 
+                src="https://images.seeklogo.com/logo-png/48/1/zerodha-kite-logo-png_seeklogo-487028.png"
+                alt="Kite Logo"
+                className="w-8 h-8 object-contain"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null;
+                  target.src = "https://zerodha.com/static/images/logo.svg";
+                }}
+              />
+            </div>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-blue-600">
+                Kite Portfolio
+              </h1>
+              <p className="text-slate-400 text-sm mt-1 flex items-center">
+                <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+                Real-time stock market portfolio analysis and insights
+              </p>
+            </div>
           </div>
-          <Link to="/portfolio" className="text-blue-400 hover:text-blue-300 transition-colors">
+          <Link to="/portfolio" className="text-blue-400 hover:text-blue-300 transition-colors p-2 bg-slate-800/50 rounded-full">
             <ArrowLeft className="h-6 w-6" />
           </Link>
         </div>
