@@ -44,6 +44,7 @@ cd FinPilot-Financial_Advisor
 
 2. Create a virtual environment and install dependencies:
 ```bash
+prefer python11
 python -m venv venv
 source venv/bin/activate  # On Windows, use: venv\Scripts\activate
 pip install -r requirements.txt
