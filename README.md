@@ -42,9 +42,8 @@ git clone https://github.com/yourusername/FinPilot-Financial_Advisor.git
 cd FinPilot-Financial_Advisor
 ```
 
-2. Create a virtual environment and install dependencies:
+2. Create a virtual environment and install dependencies(prefer python11):
 ```bash
-prefer python11
 python -m venv venv
 source venv/bin/activate  # On Windows, use: venv\Scripts\activate
 pip install -r requirements.txt
