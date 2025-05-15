@@ -18,11 +18,11 @@ interface KiteHolding {
   isin: string;
 }
 
-interface HoldingsTableProps {
+interface KiteHoldingsTableProps {
   holdings: KiteHolding[];
 }
 
-function HoldingsTable({ holdings }: HoldingsTableProps) {
+function KiteHoldingsTable({ holdings }: KiteHoldingsTableProps) {
   // Format currency values
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -150,4 +150,4 @@ function HoldingsTable({ holdings }: HoldingsTableProps) {
   );
 }
 
-export default HoldingsTable;
+export default KiteHoldingsTable; 

@@ -19,8 +19,11 @@ const API_ENDPOINTS = {
 
   // Kite Portfolio
   kitePortfolio: {
-    query: `${API_BASE_URL}/api/kite/portfolio/query`,
+    autoLogin: `${API_BASE_URL}/api/kite/auto-login`,
+    portfolio: `${API_BASE_URL}/api/kite/portfolio`,
     holdings: `${API_BASE_URL}/api/kite/portfolio/holdings`,
+    positions: `${API_BASE_URL}/api/kite/portfolio/positions`,
+    query: `${API_BASE_URL}/api/kite/portfolio/query`
   },
 
   // System endpoints

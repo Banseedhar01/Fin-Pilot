@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     BINANCE_API_KEY: str = os.getenv("BINANCE_API_KEY", "")
     BINANCE_API_SECRET: str = os.getenv("BINANCE_API_SECRET", "")
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
+    KITE_API_KEY: str = os.getenv("KITE_API_KEY", "")
+    KITE_API_SECRET: str = os.getenv("KITE_API_SECRET", "")
     
     # Pinecone Settings
     PINECONE_API_KEY: str = os.getenv("PINECONE_API_KEY", "")
