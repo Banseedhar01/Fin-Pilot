@@ -5,6 +5,12 @@ interface ApiResponse {
   data: any;
 }
 
+interface KiteLoginCredentials {
+  user_id: string;
+  password: string;
+  totp_secret: string;
+}
+
 /**
  * ApiService - Handles all API requests to the backend
  */
@@ -260,7 +266,111 @@ class ApiService {
   }
 
   /**
-   * Get Kite holdings
+   * Auto login to Kite using credentials
+   * @param credentials - Login credentials including user_id, password and totp_secret
+   */
+  static async kiteAutoLogin(credentials: KiteLoginCredentials): Promise<ApiResponse> {
+    try {
+      console.log('Sending auto login request...');
+      const response = await fetch(API_ENDPOINTS.kitePortfolio.autoLogin, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials)
+      });
+
+      let data;
+      try {
+        const responseText = await response.text();
+        console.log('Raw response:', responseText);
+        
+        if (!responseText) {
+          throw new Error('Empty response from server');
+        }
+        
+        data = JSON.parse(responseText);
+        console.log('Parsed response:', data);
+      } catch (jsonError) {
+        console.error('Failed to parse JSON response:', jsonError);
+        return {
+          status: 'error',
+          data: {
+            message: 'Invalid response from server',
+            detail: 'The server response could not be parsed'
+          }
+        };
+      }
+
+      if (!response.ok) {
+        console.error('Auto login error response:', data);
+        return {
+          status: 'error',
+          data: {
+            message: data?.message || data?.detail || 'Auto login failed',
+            detail: data?.detail || 'Server returned an error'
+          }
+        };
+      }
+
+      // Handle successful response
+      if (data.status === 'success' && data.data?.access_token) {
+        return {
+          status: 'success',
+          data: {
+            access_token: data.data.access_token,
+            public_token: data.data.public_token || null
+          }
+        };
+      } else {
+        return {
+          status: 'error',
+          data: {
+            message: data?.message || 'Invalid response format',
+            detail: 'Server response did not contain required data'
+          }
+        };
+      }
+    } catch (error) {
+      console.error('Auto login error:', error);
+      return {
+        status: 'error',
+        data: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          detail: 'Failed to complete auto login request'
+        }
+      };
+    }
+  }
+
+  /**
+   * Get complete Kite portfolio data
+   */
+  static async getKitePortfolio(): Promise<ApiResponse> {
+    try {
+      const response = await fetch(API_ENDPOINTS.kitePortfolio.portfolio, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Kite portfolio error:', error);
+      return {
+        status: 'error',
+        data: { message: error instanceof Error ? error.message : 'Unknown error' }
+      };
+    }
+  }
+
+  /**
+   * Get Kite portfolio holdings
    */
   static async getKiteHoldings(): Promise<ApiResponse> {
     try {
@@ -278,6 +388,32 @@ class ApiService {
       return await response.json();
     } catch (error) {
       console.error('Kite holdings error:', error);
+      return {
+        status: 'error',
+        data: { message: error instanceof Error ? error.message : 'Unknown error' }
+      };
+    }
+  }
+
+  /**
+   * Get Kite portfolio positions
+   */
+  static async getKitePositions(): Promise<ApiResponse> {
+    try {
+      const response = await fetch(API_ENDPOINTS.kitePortfolio.positions, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Kite positions error:', error);
       return {
         status: 'error',
         data: { message: error instanceof Error ? error.message : 'Unknown error' }

@@ -4,14 +4,20 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
 from pathlib import Path
-from typing import Dict, Any, Union, Optional
+from typing import Dict, Any, Union, Optional, List
 from pydantic import BaseModel
 from python_backend.binance.portfolio_manager import BinancePortfolioManager
+from python_backend.kite.portfolio_manager import KitePortfolioManager
 from python_backend.core.config import get_settings
+from python_backend.core.logger import setup_logger
 from datetime import datetime
+import logging
 
 # Get settings
 settings = get_settings()
+
+# Setup logger
+logger = setup_logger(__name__)
 
 # Define request and response models
 class QueryRequest(BaseModel):
@@ -39,6 +45,39 @@ class Response(BaseModel):
             }
         }
 
+class PortfolioResponse(BaseModel):
+    status: str
+    data: Optional[Dict[str, Any]] = None
+    message: Optional[str] = None
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "status": "success",
+                "data": {
+                    "message": "Response message or data"
+                }
+            }
+        }
+
+class HoldingResponse(BaseModel):
+    symbol: str
+    quantity: float
+    average_price: float
+    current_price: float
+    total_value: float
+    pnl: float
+    pnl_percentage: float
+
+class PositionResponse(BaseModel):
+    symbol: str
+    quantity: float
+    average_price: float
+    current_price: float
+    total_value: float
+    pnl: float
+    pnl_percentage: float
+
 # Initialize FastAPI app with metadata
 app = FastAPI(
     title="FinPilot Financial Advisor",
@@ -57,9 +96,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# Initialize portfolio manager
+# Initialize portfolio managers
 binance_portfolio_manager = BinancePortfolioManager()
+kite_portfolio_manager = KitePortfolioManager()
 
 # Try to mount the React build folder if it exists
 react_build_dir = Path("FinPilot-Frontend/build")
@@ -132,7 +171,6 @@ async def get_binance_holdings():
     except Exception as e:
         return create_response("error", message=str(e))
 
-
 @app.get("/api/binance/portfolio/analysis", response_model=Response, tags=["Binance Portfolio"])
 async def analyze_binance_portfolio():
     """
@@ -146,18 +184,95 @@ async def analyze_binance_portfolio():
     except Exception as e:
         return create_response("error", message=str(e))
 
-
 # ---- Kite Portfolio API Routes ----
+@app.get("/api/kite/portfolio", response_model=Response, tags=["Kite Portfolio"])
+async def get_kite_portfolio():
+    """
+    Get complete Kite portfolio data
+    
+    Returns:
+        Response: Complete portfolio data including holdings, positions, net value and total P&L
+    """
+    try:
+        if not kite_portfolio_manager.is_authenticated():
+            return create_response("error", message="User not authenticated. Please login first.")
+            
+        portfolio = kite_portfolio_manager.fetch_portfolio()
+        
+        # Convert portfolio to dictionary format with consistent data types
+        portfolio_dict = {
+            "holdings": [
+                {
+                    "trading_symbol": str(h.trading_symbol or ""),
+                    "quantity": int(h.quantity or 0),
+                    "average_price": float(h.average_price or 0.0),
+                    "last_price": float(h.last_price or 0.0),
+                    "pnl": float(h.pnl or 0.0),
+                    "product": str(h.product or ""),
+                    "exchange": str(h.exchange or ""),
+                    "instrument_token": int(h.instrument_token or 0),
+                    "t1_quantity": int(h.t1_quantity or 0),
+                    "realised_quantity": int(h.realised_quantity or 0),
+                    "authorised_quantity": int(h.authorised_quantity or 0),
+                    "opening_quantity": int(h.opening_quantity or 0),
+                    "collateral_quantity": int(h.collateral_quantity or 0),
+                    "collateral_type": str(h.collateral_type or ""),
+                    "isin": str(h.isin or "")
+                } for h in portfolio.holdings
+            ],
+            "positions": [
+                {
+                    "trading_symbol": str(p.trading_symbol or ""),
+                    "quantity": int(p.quantity or 0),
+                    "average_price": float(p.average_price or 0.0),
+                    "last_price": float(p.last_price or 0.0),
+                    "pnl": float(p.pnl or 0.0),
+                    "product": str(p.product or ""),
+                    "exchange": str(p.exchange or ""),
+                    "instrument_token": int(p.instrument_token or 0)
+                } for p in portfolio.positions
+            ],
+            "net_value": float(portfolio.net_value or 0.0),
+            "total_pnl": float(portfolio.total_pnl or 0.0),
+            "last_updated": portfolio.last_updated.isoformat()
+        }
+        
+        return create_response("success", data={"portfolio": portfolio_dict})
+    except Exception as e:
+        logger.error(f"Error fetching portfolio: {str(e)}")
+        return create_response("error", message=str(e))
+
 @app.get("/api/kite/portfolio/holdings", response_model=Response, tags=["Kite Portfolio"])
 async def get_kite_holdings():
     """
     Get Kite portfolio holdings
     
-    Returns a list of all holdings in your Kite portfolio with details
+    Returns:
+        Response: List of all holdings in your Kite portfolio with details
     """
     try:
-        holdings = kite_portfolio_agent.get_holdings()
-        return holdings
+        if not kite_portfolio_manager.is_authenticated():
+            return create_response("error", message="User not authenticated. Please login first.")
+            
+        holdings = kite_portfolio_manager.get_holdings()
+        return create_response("success", data={"holdings": holdings})
+    except Exception as e:
+        return create_response("error", message=str(e))
+
+@app.get("/api/kite/portfolio/positions", response_model=Response, tags=["Kite Portfolio"])
+async def get_kite_positions():
+    """
+    Get Kite portfolio positions
+    
+    Returns:
+        Response: List of all positions in your Kite portfolio with details
+    """
+    try:
+        if not kite_portfolio_manager.is_authenticated():
+            return create_response("error", message="User not authenticated. Please login first.")
+            
+        positions = kite_portfolio_manager.get_positions()
+        return create_response("success", data={"positions": positions})
     except Exception as e:
         return create_response("error", message=str(e))
 
@@ -171,10 +286,40 @@ async def process_kite_query(query: QueryRequest):
     Returns analysis and insights about your Kite portfolio based on the query
     """
     try:
-        response = kite_portfolio_agent.process_query(query.text)
-        return response
+        if not kite_portfolio_manager.is_authenticated():
+            return create_response("error", message="User not authenticated. Please login first.")
+            
+        portfolio = kite_portfolio_manager.fetch_portfolio()
+        return create_response("success", data={"portfolio": portfolio})
     except Exception as e:
         return create_response("error", message=str(e))
+
+@app.post("/api/kite/auto-login", response_model=Response, tags=["Kite Portfolio"])
+async def kite_auto_login(request: Request):
+    """
+    Auto login to Kite using user credentials and TOTP
+    
+    Args:
+        request: The request object containing user_id, password and totp_secret
+        
+    Returns:
+        Response: Access token and public token
+    """
+    data = await request.json()
+    user_id = data.get('user_id')
+    password = data.get('password')
+    totp_secret = data.get('totp_secret')
+    
+    response = kite_portfolio_manager.handle_auto_login(
+        user_id=user_id,
+        password=password,
+        totp_secret=totp_secret
+    )
+    return create_response(
+        status=response["status"],
+        data=response.get("data"),
+        message=response.get("message")
+    )
 
 # ---- System API Routes ----
 @app.get("/api/health", tags=["System"])

@@ -3,7 +3,7 @@ import { ArrowLeft, Send } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import ChatBox from '../components/ChatBox';
 import { Chart, registerables, ChartOptions } from 'chart.js';
-import HoldingsTable from '../components/HoldingsTable';
+import BinanceHoldingsTable from '../components/BinanceHoldingsTable';
 import ApiService from '../services/apiService';
 import { toast } from 'react-hot-toast';
 
@@ -1633,7 +1633,7 @@ function BinancePortfolio() {
                   <>
                     {spotHoldings.length > 0 ? (
                       <div className="bg-slate-900/30 rounded-lg p-1">
-                        <HoldingsTable holdings={spotHoldings} />
+                        <BinanceHoldingsTable holdings={spotHoldings} />
                       </div>
                     ) : (
                       <div className="bg-slate-900/30 rounded-lg p-6">
@@ -1660,7 +1660,7 @@ function BinancePortfolio() {
                   <>
                     {marginHoldings.length > 0 ? (
                       <div className="bg-slate-900/30 rounded-lg p-1">
-                        <HoldingsTable holdings={marginHoldings} />
+                        <BinanceHoldingsTable holdings={marginHoldings} />
                       </div>
                     ) : (
                       <div className="bg-slate-900/30 rounded-lg p-6">
@@ -1687,7 +1687,7 @@ function BinancePortfolio() {
                   <>
                     {futuresHoldings.length > 0 ? (
                       <div className="bg-slate-900/30 rounded-lg p-1">
-                        <HoldingsTable holdings={futuresHoldings} />
+                        <BinanceHoldingsTable holdings={futuresHoldings} />
                       </div>
                     ) : (
                       <div className="bg-slate-900/30 rounded-lg p-6">
